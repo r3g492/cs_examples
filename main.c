@@ -4,7 +4,7 @@
 #include <unistd.h>
 
 
-int add_program(int a, int b, int* pc1, int* pc2) {
+int add_program(int a, int b, unsigned long* pc1, unsigned long* pc2) {
     int result;
     /*
      * __asm__
@@ -13,12 +13,11 @@ int add_program(int a, int b, int* pc1, int* pc2) {
      */
     __asm__ (
         "label1:\n"
-        "movl %1, %%eax;\n"
-        "movl %2, %%ebx;\n"
+        "movl %1, %%eax;\n" // 2 byte
+        "movl %2, %%ebx;\n" // 2 byte
         "label2:\n"
         "addl %%ebx, %%eax;\n"
         "movl %%eax, %0;\n"
-
         "lea label1(%%rip), %%ecx;\n"
         "movl %%ecx, %3;\n"
 
@@ -184,7 +183,7 @@ int main(void) {
 
     int a_add = 5;
     int b_add = 3;
-    long pc1, pc2;
+    unsigned long pc1, pc2;
     int sum = add_program(a_add, b_add, &pc1, &pc2);
     printf("pc1: %ld\n", pc1);
     printf("pc2: %ld\n", pc2);
