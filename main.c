@@ -185,8 +185,8 @@ int main(void) {
     int b_add = 3;
     unsigned long pc1, pc2;
     int sum = add_program(a_add, b_add, &pc1, &pc2);
-    printf("pc1: %ld\n", pc1);
-    printf("pc2: %ld\n", pc2);
+    printf("pc1: %lu\n", pc1);
+    printf("pc2: %lu\n", pc2);
     printf("%d + %d = %d\n", a_add, b_add, sum);
 
     printf("\n");
@@ -208,7 +208,7 @@ int main(void) {
      * 컨텍스트 스위칭을 간단하게 구현해본다면 ..
      */
 
-    struct context add_c;
+    /*struct context add_c;
     add_c.code_depth = 0;
     struct context sub_c;
     sub_c.code_depth = 0;
@@ -220,7 +220,7 @@ int main(void) {
     printf("add: %d\n", add_c.result);
     printf("sub: %d\n", sub_c.result);
 
-    printf("\n");
+    printf("\n");*/
 
     /*
      * 프로세스 주소 공간은 커널에서 컨텍스트 스위칭과 프로그램 실행을 관리하기 위한 구조로 되어있다.
@@ -235,7 +235,7 @@ int main(void) {
     /*
      * 스레드(thread)는 하나의 프로세스 주소 공간을 (일부) 공유하는 컨텍스트 스위칭 구조이다.
      */
-    pthread_t threadA, threadB;
+    /*pthread_t threadA, threadB;
     pthread_create(&threadA, NULL, (void*)funcA, NULL);
     pthread_create(&threadB, NULL, (void*)funcB, NULL);
     pthread_join(threadA, NULL);
@@ -243,6 +243,7 @@ int main(void) {
 
     printf("resA: %d\n", resA);
     printf("resB: %d\n", resB);
+    */
 
     /*
      * IPC는 커널 api를 호출해야 하지만, 스레드는 위와 같이 공용 라이브러리만 사용하면 프로그래머가 관리할 수 있다.
@@ -253,7 +254,7 @@ int main(void) {
      * 스레드 생성 관리의 책임을 프로그래머가 아닌 라이브러리가 맡는다.
      */
 
-    thread_pool_init();
+    /*thread_pool_init();
 
     for (int i = 0; i < 20; i++) {
         int* num = malloc(sizeof(int));
@@ -261,7 +262,7 @@ int main(void) {
         thread_pool_add_task(example_task, num);
     }
 
-    sleep(10);
+    sleep(10);*/
 
 
     return 0;
