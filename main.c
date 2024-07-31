@@ -199,6 +199,7 @@ int main(void) {
      * CPU instruction set은 제조사, 제품마다 다르다.
      * ref1 온라인 MOS 6502 프로세서 어셈블리 이뮬레이터: http://txt3.de/
      * ref2 MOS 6502 프로세서 어셈블리 인스트럭션 셋: https://www.masswerk.at/6502/6502_instruction_set.html
+     * ref3 오픈소스 인스트럭션 아키텍처 risc-v https://github.com/riscv
      */
 
     /*
