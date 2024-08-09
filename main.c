@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include "t1.h"
+#include "t2.h"
 
 
 void execute_t1();
@@ -16,6 +17,25 @@ int main(void) {
 }
 
 void execute_t2() {
+    // new thread to run event_loop function
+    event_state = 1;
+    pthread_t event_thread;
+    pthread_create(&event_thread, NULL, (void*)event_loop, NULL);
+    // sleep(5);
+    event_state = 0;
+    // sleep(5);
+
+
+    thread_pool_init_v2();
+
+    for (int i = 0; i < 20; i++) {
+        int* num = malloc(sizeof(int));
+        *num = i;
+        thread_pool_add_task_v2(example_task_v2, num);
+    }
+
+    sleep(10);
+
     /**
      * 다중 프로세스
      *
@@ -102,6 +122,12 @@ void execute_t2() {
 
     /**
      * 한 줄 요약: 현대 서버 기술은 이벤트, 스레드, 코루틴을 적재적소에 사용한다.
+     *
+     * 서버 라는 요구사항은 많은 io를 병목 없이 해결하는게 목적이고,
+     * 이를 위해 단순히 프로그램을 하나씩 실행하거나, 스레드 하나당 프로그램을 하나씩 사용하거나,
+     * 요청 하나당 스레드를 생성하는 방법만으로는 최대 효율을 낼 수 없다.
+     *
+     * https://norvig.com/21-days.html
      */
 
 
