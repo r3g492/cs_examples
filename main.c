@@ -9,7 +9,7 @@ void execute_t1();
 void execute_t2();
 
 int main(void) {
-    execute_t1();
+    // execute_t1();
     execute_t2();
 
     return 0;
@@ -34,6 +34,7 @@ void execute_t2() {
      * 스레드 안전 문제가 발생할 수 있다.
      *
      * C10K 문제를 해결하려면, 다중 스레드/ 스레드 풀만으로는 힘들다.
+     * https://en.wikipedia.org/wiki/C10k_problem
      *
      * 그래서 .. event-based concurrency를 이용한 event driven programming 등장
      * 서버의 이벤트는 대부분 입출력에 관계 되어 있음
@@ -45,6 +46,8 @@ void execute_t2() {
      * 2. 핸들러 함수는 이벤트 루프와 동일한 스레드에서 실행될 필요가 있는 경우도 있고, 없는 경우도 있다.
      *
      * epoll로 해결한다. (사실 상 while loop로 해결한다는 말과 같다.)
+     * https://man7.org/linux/man-pages/man7/epoll.7.html
+     *
      * 이벤트 순환과 핸들러를 같은 스레드로 처리할 경우, cpu 자원이 많이 소모된다면,
      * 시스템 응답 시간이 저하된다. 이벤트 순환이 핸들러에 의해 느려지게 된다.
      *
