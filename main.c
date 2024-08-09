@@ -21,21 +21,9 @@ void execute_t2() {
     event_state = 1;
     pthread_t event_thread;
     pthread_create(&event_thread, NULL, (void*)event_loop, NULL);
-    // sleep(5);
+    sleep(5);
+    sleep(5);
     event_state = 0;
-    // sleep(5);
-
-
-    thread_pool_init_v2();
-
-    for (int i = 0; i < 20; i++) {
-        int* num = malloc(sizeof(int));
-        *num = i;
-        thread_pool_add_task_v2(example_task_v2, num);
-    }
-
-    sleep(10);
-
     /**
      * 다중 프로세스
      *
