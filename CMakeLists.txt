@@ -9,4 +9,8 @@ if(MSVC)
 endif()
 
 add_executable(cs_examples main.c
+        t1.c
+        t1.h
+        t2.c
+        t2.h
 )
