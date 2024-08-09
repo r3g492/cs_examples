@@ -85,7 +85,7 @@ void funcA(int* resA) {
 }
 
 void funcB(int* resB) {
-    resB = 2;
+    *resB = 2;
 }
 
 
