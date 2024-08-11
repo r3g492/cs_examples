@@ -15,7 +15,7 @@ void io_3();
 extern int event_state;
 
 typedef void (*func_ptr)();
-extern func_ptr handlers[];
+extern func_ptr blocking_handlers[];
 
 void event_loop();
 
