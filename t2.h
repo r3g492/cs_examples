@@ -6,20 +6,7 @@
 #define CS_EXAMPLES_T2_H
 
 
-
-
-void io_1();
-void io_2();
-void io_3();
-
-extern int event_state;
-
-typedef void (*func_ptr)();
-extern func_ptr blocking_handlers[];
-
-void event_loop();
-
-
+extern void execute_t2();
 
 
 #endif //CS_EXAMPLES_T2_H
