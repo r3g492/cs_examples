@@ -2,7 +2,6 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <stdbool.h>
-#include "t1.h"
 #include "t2.h"
 
 
@@ -169,59 +168,75 @@ void worker_strategy_4() {
 }
 
 void worker_strategy_5() {
-    int j = 0;
-    int i = 1;
-    while (j < 1) {
-        int next = (workers[j].cur_work_id + i) % WORK_SIZE;
-        if (next >= WORK_SIZE) {
-            next = 0;
+    int blocking_count = 0;
+    int non_blocking_count = 0;
+
+    for (int i = 0; i < WORK_SIZE; i++) {
+        if (!works[i].is_done) {
+            if (strcmp(works[i].event, "blocking") == 0) {
+                blocking_count++;
+            } else {
+                non_blocking_count++;
+            }
         }
-        if (works[next].is_done == false && works[next].event == "blocking") {
-            workers[j].target_work_id = next;
-            workers[j].event = works[next].event;
-            j++;
-        }
-        i++;
     }
 
-    i = 1;
-    int lap = 0;
-    while (j < WORKER_SIZE && lap < 2) {
-        int next = (workers[j].cur_work_id + i);
-        if (next >= WORK_SIZE) {
-            next = 0;
-            lap++;
+    int blocking_assigned = 0;
+    int non_blocking_assigned = 0;
+
+    for (int i = 0; i < WORKER_SIZE; i++) {
+        if (blocking_assigned < blocking_count) {
+            for (int j = 0; j < WORK_SIZE; j++) {
+                if (!works[j].is_done && strcmp(works[j].event, "blocking") == 0) {
+                    workers[i].target_work_id = j;
+                    workers[i].event = works[j].event;
+                    blocking_assigned++;
+                    break;
+                }
+            }
         }
-        if (works[next].is_done == false && works[next].event == "non-blocking") {
-            workers[j].target_work_id = next;
-            workers[j].event = works[next].event;
-            j++;
+        else if (non_blocking_assigned < non_blocking_count) {
+            for (int j = 0; j < WORK_SIZE; j++) {
+                if (!works[j].is_done && strcmp(works[j].event, "non-blocking") == 0) {
+                    workers[i].target_work_id = j;
+                    workers[i].event = works[j].event;
+                    non_blocking_assigned++;
+                    break;
+                }
+            }
         }
-        i++;
     }
 
-    if (j == WORKER_SIZE) {
-        return;
-    }
-
-    j = 0;
-    i = 1;
-    while (j < WORKER_SIZE) {
-        int next = (workers[j].cur_work_id + i);
-        if (next >= WORK_SIZE) {
-            next = 0;
+    for (int i = 0; i < WORKER_SIZE; i++) {
+        if (workers[i].target_work_id == -1) {
+            for (int j = 0; j < WORK_SIZE; j++) {
+                if (!works[j].is_done) {
+                    workers[i].target_work_id = j;
+                    workers[i].event = works[j].event;
+                    break;
+                }
+            }
         }
-        if (works[next].is_done == false) {
-            workers[j].target_work_id = next;
-            workers[j].event = works[next].event;
-            j++;
-        }
-        i++;
     }
 }
 
 
 void execute_t2() {
+    /**
+     * 요약: 현대 서버 기술은 이벤트, 스레드, 코루틴을 적재적소에 사용한다.
+     *
+     * 서버의 목적은 많은 I/O를 병목 없이 처리하는 것이다.
+     * 단순히 프로그램을 하나씩 실행하거나, 스레드 하나당 프로그램을 하나씩 사용하거나,
+     * 요청마다 스레드를 생성하는 방법만으로는 최대 효율을 낼 수 없다.
+     *
+     * 서버 기술의 핵심은 N개의 고객 요청을 제한된 CPU 자원에 효율적으로 분배하는 것이다.
+     * 1. 스레드의 갯수는 N에 비해 턱 없이 적기 때문에, 각 요청에 스레드를 전담시키는 것은 비효율적이다.
+     *    (C10k 문제: https://en.wikipedia.org/wiki/C10k_problem)
+     * 2. 스레드 외에도, 코루틴을 사용하여 비동기적으로 코드를 실행하며, 또한 이벤트 기반 프로그래밍과 결합한다.
+     *    Async, 이벤트 드리븐 프로그래밍, RPC 등은 코루틴을 이용한 기술로 볼 수 있다.
+     * 3. 작업의 특성에 따라, 블로킹 작업과 논블로킹 작업에 대해 서로 다른 전략을 사용하여 자원을 효율적으로 사용한다.
+     *
+     **/
 
     // 초기화
     init_workers();
@@ -234,29 +249,119 @@ void execute_t2() {
         }
         /**
          * 집중해서 하나씩
-         */
+         **/
         // worker_strategy_1();
+
         /**
-         * 여러 개를 한번에
-         */
+         * thread worker 0: / working on: -1 / event: idle
+         * thread worker 1: / working on: -1 / event: idle
+         * thread worker 2: / working on: -1 / event: idle
+         * work 0: non-blocking ========== [done] end at time: 4
+         * work 1: non-blocking ========== [done] end at time: 8
+         * work 2: non-blocking ========== [done] end at time: 12
+         * work 3: non-blocking ========== [done] end at time: 17
+         * work 4: non-blocking ========== [done] end at time: 21
+         * work 5: blocking ========== [done] end at time: 25
+         * work 6: blocking ========== [done] end at time: 30
+         * work 7: blocking ========== [done] end at time: 34
+         * work 8: blocking ========== [done] end at time: 38
+         * work 9: blocking ========== [done] end at time: 43
+         * spent time: 43
+         *
+         **/
+
+        /**
+         * 여러 개를 동시에, 순차적으로
+         **/
         // worker_strategy_2();
+        /**
+         * thread worker 0: / working on: -1 / event: idle
+         * thread worker 1: / working on: -1 / event: idle
+         * thread worker 2: / working on: -1 / event: idle
+         * work 0: non-blocking ========== [done] end at time: 10
+         * work 1: non-blocking ========== [done] end at time: 10
+         * work 2: non-blocking ========== [done] end at time: 10
+         * work 3: non-blocking ========== [done] end at time: 21
+         * work 4: non-blocking ========== [done] end at time: 21
+         * work 5: blocking ========== [done] end at time: 21
+         * work 6: blocking ========== [done] end at time: 32
+         * work 7: blocking ========== [done] end at time: 32
+         * work 8: blocking ========== [done] end at time: 32
+         * work 9: blocking ========== [done] end at time: 43
+         * spent time: 43
+         *
+         **/
+
         /**
          * 하나는 블로킹 전담, 나머지는 아무렇게나
          */
         // worker_strategy_3();
         /**
+         * thread worker 0: / working on: -1 / event: idle
+         * thread worker 1: / working on: -1 / event: idle
+         * thread worker 2: / working on: -1 / event: idle
+         * work 0: non-blocking ========== [done] end at time: 10
+         * work 1: non-blocking ========== [done] end at time: 10
+         * work 2: non-blocking ========== [done] end at time: 21
+         * work 3: non-blocking ========== [done] end at time: 21
+         * work 4: non-blocking ========== [done] end at time: 32
+         * work 5: blocking ========== [done] end at time: 10
+         * work 6: blocking ========== [done] end at time: 21
+         * work 7: blocking ========== [done] end at time: 27
+         * work 8: blocking =========== [done] end at time: 34
+         * work 9: blocking ========== [done] end at time: 40
+         * spent time: 40
+         **/
+
+        /**
          * 블로킹 논블로킹 상관 없이 공평하게
          */
-        worker_strategy_4();
+        // worker_strategy_4();
+        /**
+         * thread worker 0: / working on: -1 / event: idle
+         * thread worker 1: / working on: -1 / event: idle
+         * thread worker 2: / working on: -1 / event: idle
+         * work 0: non-blocking =========== [done] end at time: 40
+         * work 1: non-blocking ========== [done] end at time: 30
+         * work 2: non-blocking ========== [done] end at time: 31
+         * work 3: non-blocking ========== [done] end at time: 33
+         * work 4: non-blocking =========== [done] end at time: 42
+         * work 5: blocking ========== [done] end at time: 6
+         * work 6: blocking ========== [done] end at time: 13
+         * work 7: blocking ========== [done] end at time: 20
+         * work 8: blocking ========== [done] end at time: 27
+         * work 9: blocking ========== [done] end at time: 37
+         * spent time: 42
+         **/
 
-        worker_strategy_5();
+        /**
+         * 좀 복잡한 전략
+         **/
+        // worker_strategy_5();
+
+        /**
+         * thread worker 0: / working on: -1 / event: idle
+         * thread worker 1: / working on: -1 / event: idle
+         * thread worker 2: / working on: -1 / event: idle
+         * work 0: non-blocking ========== [done] end at time: 21
+         * work 1: non-blocking ========== [done] end at time: 27
+         * work 2: non-blocking ========== [done] end at time: 32
+         * work 3: non-blocking ========== [done] end at time: 37
+         * work 4: non-blocking ========== [done] end at time: 41
+         * work 5: blocking ========== [done] end at time: 4
+         * work 6: blocking ========== [done] end at time: 8
+         * work 7: blocking ========== [done] end at time: 12
+         * work 8: blocking ========== [done] end at time: 18
+         * work 9: blocking ========== [done] end at time: 29
+         * spent time: 41
+         **/
 
         do_work(time);
         print_workers_and_works();
 
         printf("spent time: %d\n", time);
 
-        sleep((unsigned int) 1);
+        sleep((unsigned int) 0.5);
         time++;
     }
 
@@ -264,100 +369,4 @@ void execute_t2() {
     print_workers_and_works();
 
     printf("spent time: %d\n", time);
-
-    /**
-     * 다중 프로세스
-     *
-     * linux fork
-     * 부모 프로세스가 자식 프로세스를 만든다.
-     * 개별 프로세스의 주소 공간이 분리되어 있어 쉽다.
-     * 다중 코어 사용 가능
-     * IPC 통신이 필요하다.
-     * 프로세스 생성 비용이 크다.
-     *
-     * 다중 스레드
-     * 스레드는 주소 공간을 공유하여 IPC가 필요 없다.
-     * 종료 시 모든 스레드가 같이 종료 된다.
-     * 각 요청에 대응하는 스레드 생성 가능
-     * 스레드 중 일부가 블로킹 되더라도 나머지 스레드는 계속 동작한다.
-     * 스레드 안전 문제가 발생할 수 있다.
-     *
-     * C10K 문제를 해결하려면, 다중 스레드/ 스레드 풀만으로는 힘들다.
-     * https://en.wikipedia.org/wiki/C10k_problem
-     *
-     * 그래서 .. event-based concurrency를 이용한 event driven programming 등장
-     * 서버의 이벤트는 대부분 입출력에 관계 되어 있음
-     * 예를 들면 네트워크 데이터의 수신 여부, 파일의 읽기/쓰기 여부 등
-     * 이벤트 처리 함수를 보통 핸들러라고 부름.
-     * 서버는 이벤트가 도착할때까지 기다렸다가 도착하면 이벤트에 맞는 핸들러를 호출한다.
-     * 이벤트 루프는 이벤트를 기다리는 무한 루프이다.
-     * 1. 함수 하나로 여러 이벤트를 받아야 한다.
-     * 2. 핸들러 함수는 이벤트 루프와 동일한 스레드에서 실행될 필요가 있는 경우도 있고, 없는 경우도 있다.
-     *
-     * epoll로 해결한다. (사실 상 while loop로 해결한다는 말과 같다.)
-     * https://man7.org/linux/man-pages/man7/epoll.7.html
-     *
-     * 이벤트 순환과 핸들러를 같은 스레드로 처리할 경우, cpu 자원이 많이 소모된다면,
-     * 시스템 응답 시간이 저하된다. 이벤트 순환이 핸들러에 의해 느려지게 된다.
-     *
-     * 다중 스레드로 핸들러별로 스레드를 배정해야 하여 다중 코어를 활용하는 방식을 reactor pattern(반응자 패턴)라고 한다.
-     * 케이스 별로 나눈다.
-     * 1. 입출력 작업에 해당하는 논블로킹 인터페이스가 있는 경우
-     * 2. 입출력 작업에 블로킹 인터페이스만 있는 경우: 이벤트 루프에서 절대로 블로킹 함수를 호출하면 안된다.
-     * 그럴 경우 모든 이벤트가 중단된다.
-     *
-     * 최종 구조 그림 참조
-     *
-     * 논블로킹은 이벤트 루프에서 해도 되고,
-     * 블로킹은 반드시 새로운 스레드에서 처리 해야함.
-     * RPC : Remote Procedure Call
-     * 프로그래머가 함수 호출하는 것처럼 외부 서버 호출. (Feign Client 같은 것)
-     * v1: GetUserInfo(request, response);
-     * v2: GetUserInfo(request, callback);
-     *
-     */
-
-    /**
-     * void handler_after_GetStorkInfo(response) {
-     *  G;
-     *  H;
-     * }
-     *
-     * void handler_after_GetQueryInfo(response) {
-     *  E;
-     *  F;
-     *  GetStorkInfo(request, handler_after_GetStorkInfo); // 서버 C 호출
-     * }
-     * void handler_after_GetUserInfo(response) {
-     *  C;
-     *  D;
-     *  GetQueryInfo(request, handler_after_GetQueryInfo); // 서버 B 호출
-     * }
-     * void handler(request) {
-     *  A;
-     *  B;
-     *  GetUserInfo(request, handler_after_GetUserInfo); // 서버 A 호출
-     * }
-     */
-
-    /**
-     * 효율적인 비동기와 간단한 동기를 합친 코루틴
-     * handler를 코루틴에서 실행하도록 한다.
-     * 코루틴 추가 후 서버의 전체 구조
-     * 하드웨어: CPU
-     * 커널 모드: 스레드
-     * 유저 모드: 코루틴
-     */
-
-    /**
-     * 한 줄 요약: 현대 서버 기술은 이벤트, 스레드, 코루틴을 적재적소에 사용한다.
-     *
-     * 서버 라는 요구사항은 많은 io를 병목 없이 해결하는게 목적이고,
-     * 이를 위해 단순히 프로그램을 하나씩 실행하거나, 스레드 하나당 프로그램을 하나씩 사용하거나,
-     * 요청 하나당 스레드를 생성하는 방법만으로는 최대 효율을 낼 수 없다.
-     *
-     * https://norvig.com/21-days.html
-     */
-
-
 }
