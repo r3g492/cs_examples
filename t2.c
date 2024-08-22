@@ -167,25 +167,14 @@ void worker_strategy_4() {
     }
 }
 
+
 void worker_strategy_5() {
-    int blocking_count = 0;
-    int non_blocking_count = 0;
-
-    for (int i = 0; i < WORK_SIZE; i++) {
-        if (!works[i].is_done) {
-            if (strcmp(works[i].event, "blocking") == 0) {
-                blocking_count++;
-            } else {
-                non_blocking_count++;
-            }
-        }
-    }
-
+    static int non_blocking_index = 0;  // Static so it retains value between calls
     int blocking_assigned = 0;
-    int non_blocking_assigned = 0;
 
+    // Step 1: Always assign the blocking task to one worker
     for (int i = 0; i < WORKER_SIZE; i++) {
-        if (blocking_assigned < blocking_count) {
+        if (blocking_assigned < 1) {
             for (int j = 0; j < WORK_SIZE; j++) {
                 if (!works[j].is_done && strcmp(works[j].event, "blocking") == 0) {
                     workers[i].target_work_id = j;
@@ -195,18 +184,26 @@ void worker_strategy_5() {
                 }
             }
         }
-        else if (non_blocking_assigned < non_blocking_count) {
+    }
+
+    // Step 2: Assign two non-blocking tasks in a round-robin manner
+    int assigned_non_blocking = 0;
+    for (int i = 0; i < WORKER_SIZE && assigned_non_blocking < 2; i++) {
+        if (workers[i].target_work_id == -1 || strcmp(workers[i].event, "blocking") != 0) {
             for (int j = 0; j < WORK_SIZE; j++) {
-                if (!works[j].is_done && strcmp(works[j].event, "non-blocking") == 0) {
-                    workers[i].target_work_id = j;
-                    workers[i].event = works[j].event;
-                    non_blocking_assigned++;
+                int work_index = (non_blocking_index + j) % WORK_SIZE;
+                if (!works[work_index].is_done && strcmp(works[work_index].event, "non-blocking") == 0) {
+                    workers[i].target_work_id = work_index;
+                    workers[i].event = works[work_index].event;
+                    assigned_non_blocking++;
+                    non_blocking_index = (work_index + 1) % WORK_SIZE;  // Update index for next round
                     break;
                 }
             }
         }
     }
 
+    // Step 3: If a worker is still idle, assign any remaining non-blocking task
     for (int i = 0; i < WORKER_SIZE; i++) {
         if (workers[i].target_work_id == -1) {
             for (int j = 0; j < WORK_SIZE; j++) {
@@ -219,7 +216,6 @@ void worker_strategy_5() {
         }
     }
 }
-
 
 void execute_t2() {
 
@@ -328,17 +324,17 @@ void execute_t2() {
          * thread worker 0: / working on: -1 / event: idle
          * thread worker 1: / working on: -1 / event: idle
          * thread worker 2: / working on: -1 / event: idle
-         * work 0: non-blocking ========== [done] end at time: 21
-         * work 1: non-blocking ========== [done] end at time: 27
-         * work 2: non-blocking ========== [done] end at time: 32
-         * work 3: non-blocking ========== [done] end at time: 37
-         * work 4: non-blocking ========== [done] end at time: 41
-         * work 5: blocking ========== [done] end at time: 4
-         * work 6: blocking ========== [done] end at time: 8
-         * work 7: blocking ========== [done] end at time: 12
-         * work 8: blocking ========== [done] end at time: 18
-         * work 9: blocking ========== [done] end at time: 29
-         * spent time: 41
+         * work 0: non-blocking ========== [done] end at time: 23
+         * work 1: non-blocking ========== [done] end at time: 24
+         * work 2: non-blocking ========== [done] end at time: 26
+         * work 3: non-blocking =========== [done] end at time: 28
+         * work 4: non-blocking ========== [done] end at time: 25
+         * work 5: blocking ========== [done] end at time: 10
+         * work 6: blocking ========== [done] end at time: 21
+         * work 7: blocking ========== [done] end at time: 30
+         * work 8: blocking ========== [done] end at time: 34
+         * work 9: blocking ========== [done] end at time: 39
+         * spent time: 39
          **/
 
         do_work(time);
@@ -346,7 +342,7 @@ void execute_t2() {
 
         printf("spent time: %d\n", time);
 
-        sleep((unsigned int) 1);
+        usleep(200000);
         time++;
     }
 
