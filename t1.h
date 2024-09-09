@@ -5,6 +5,7 @@
 #ifndef CS_EXAMPLES_T1_H
 #define CS_EXAMPLES_T1_H
 
+extern void execute_t1();
 
 int add_program(int a, int b, unsigned long* pc1, unsigned long* pc2);
 

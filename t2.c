@@ -231,7 +231,7 @@ void execute_t2() {
         /**
          * 집중해서 하나씩
          **/
-        worker_strategy_1();
+        // worker_strategy_1();
 
         /**
          * thread worker 0: / working on: -1 / event: idle
