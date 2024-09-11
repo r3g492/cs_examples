@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <time.h>
 
 #define ARRAY_SIZE (1024 * 1024 * 16)
@@ -14,9 +13,6 @@
 #define L3_ACCESS_TIME 50
 #define MEMORY_ACCESS_TIME 200
 
-#define CACHE_SIZE 8
-
-
 typedef struct {
     int valid;
     long address;
@@ -25,75 +21,98 @@ typedef struct {
 
 typedef struct {
     int accessTime;
-    CacheLine cacheMap[L1_SIZE];
-} L1Cache;
-
-typedef struct {
-    int accessTime;
-    CacheLine cacheMap[L2_SIZE];
-} L2Cache;
-
-typedef struct {
-    int accessTime;
-    CacheLine cacheMap[L3_SIZE];
-} L3Cache;
+    CacheLine *cacheMap;
+    int size;
+} Cache;
 
 int hash_function(long address, int cache_size) {
     return address % cache_size;
 }
 
-int find_in_cache(CacheLine *cache, int cache_size, long address) {
-    int index = hash_function(address, cache_size);
-    for (int i = 0; i < cache_size; i++) {
-        int probe_index = (index + i) % cache_size;
-        if (cache[probe_index].valid && cache[probe_index].address == address) {
-            return cache[probe_index].data;
-        } else if (!cache[probe_index].valid) {
+int find_in_cache(Cache *cache, long address) {
+    int index = hash_function(address, cache->size);
+    for (int i = 0; i < cache->size; i++) {
+        int probe_index = (index + i) % cache->size;
+        if (cache->cacheMap[probe_index].valid && cache->cacheMap[probe_index].address == address) {
+            return cache->cacheMap[probe_index].data;
+        } else if (!cache->cacheMap[probe_index].valid) {
             break;
         }
     }
     return -1;
 }
 
-void load_into_cache(CacheLine *cache, int cache_size, long address, int data) {
-    int index = hash_function(address, cache_size);
-    for (int i = 0; i < cache_size; i++) {
-        int probe_index = (index + i) % cache_size;
-        if (!cache[probe_index].valid || cache[probe_index].address == address) {
-            cache[probe_index].valid = 1;
-            cache[probe_index].address = address;
-            cache[probe_index].data = data;
+void load_into_cache(Cache *cache, long address, int data) {
+    int index = hash_function(address, cache->size);
+    for (int i = 0; i < cache->size; i++) {
+        int probe_index = (index + i) % cache->size;
+        if (!cache->cacheMap[probe_index].valid || cache->cacheMap[probe_index].address == address) {
+            cache->cacheMap[probe_index].valid = 1;
+            cache->cacheMap[probe_index].address = address;
+            cache->cacheMap[probe_index].data = data;
             return;
         }
     }
 }
 
+int access_data(Cache *l1Cache, Cache *l2Cache, Cache *l3Cache, long address) {
+    int data;
+
+    data = find_in_cache(l1Cache, address);
+    if (data != -1) {
+        printf("L1 cache hit\n");
+        return l1Cache->accessTime;
+    }
+
+    data = find_in_cache(l2Cache, address);
+    if (data != -1) {
+        printf("L2 cache hit\n");
+        load_into_cache(l1Cache, address, data);
+        return l2Cache->accessTime;
+    }
+
+    data = find_in_cache(l3Cache, address);
+    if (data != -1) {
+        printf("L3 cache hit\n");
+        load_into_cache(l2Cache, address, data);
+        load_into_cache(l1Cache, address, data);
+        return l3Cache->accessTime;
+    }
+
+    printf("Cache miss, loading from memory\n");
+    data = rand();
+    load_into_cache(l3Cache, address, data);
+    load_into_cache(l2Cache, address, data);
+    load_into_cache(l1Cache, address, data);
+    return MEMORY_ACCESS_TIME;
+}
+
 int execute_t3() {
-//    CacheLine cache[CACHE_SIZE] = {0};
-//
-//    load_into_cache(cache, CACHE_SIZE, 123456, 10);
-//    load_into_cache(cache, CACHE_SIZE, 654321, 20);
-//
-//    // Simulate accessing the cache
-//    int data = find_in_cache(cache, CACHE_SIZE, 123456);
-//    printf("Data for address 123456: %d\n", data);
-//
-//    data = find_in_cache(cache, CACHE_SIZE, 654321);
-//    printf("Data for address 654321: %d\n", data);
-//
-//    data = find_in_cache(cache, CACHE_SIZE, 111111);
-//    if (data == -1) {
-//        printf("Cache miss for address 111111\n");
-//    }
+    srand(time(NULL));
 
-    CacheLine l1CacheMap[L1_SIZE] = {0};
-    L1Cache l1Cache = {L1_ACCESS_TIME, {0}};
+    Cache l1Cache = {L1_ACCESS_TIME, malloc(L1_SIZE * sizeof(CacheLine)), L1_SIZE};
+    Cache l2Cache = {L2_ACCESS_TIME, malloc(L2_SIZE * sizeof(CacheLine)), L2_SIZE};
+    Cache l3Cache = {L3_ACCESS_TIME, malloc(L3_SIZE * sizeof(CacheLine)), L3_SIZE};
 
-    CacheLine l2CacheMap[L2_SIZE] = {0};
-    L2Cache l2Cache = {L2_ACCESS_TIME, {0}};
+    for (int i = 0; i < L1_SIZE; i++) l1Cache.cacheMap[i].valid = 0;
+    for (int i = 0; i < L2_SIZE; i++) l2Cache.cacheMap[i].valid = 0;
+    for (int i = 0; i < L3_SIZE; i++) l3Cache.cacheMap[i].valid = 0;
 
-    CacheLine l3CacheMap[L3_SIZE] = {0};
-    L2Cache l3Cache = {L3_ACCESS_TIME, {0}};
+    long addresses[] = {0x1A2B3C, 0x1A2B3C, 0x3F4E5D, 0x7A9B8C, 0x1A2B3C};
+    int totalTime = 0;
+
+    for (int i = 0; i < 5; i++) {
+        printf("Accessing address 0x%lX...\n", addresses[i]);
+        int timeTaken = access_data(&l1Cache, &l2Cache, &l3Cache, addresses[i]);
+        printf("Time taken: %d cycles\n\n", timeTaken);
+        totalTime += timeTaken;
+    }
+
+    printf("Total access time: %d cycles\n", totalTime);
+
+    free(l1Cache.cacheMap);
+    free(l2Cache.cacheMap);
+    free(l3Cache.cacheMap);
 
     return 0;
 }
