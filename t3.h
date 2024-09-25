@@ -4,5 +4,6 @@
 
 
 extern void execute_t3();
+extern void execute_t3_real_time();
 
 #endif
