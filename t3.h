@@ -5,5 +5,6 @@
 
 extern void execute_t3();
 extern void execute_t3_real_time();
+extern void execute_t3_real_time_two_cores();
 
 #endif

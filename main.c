@@ -12,7 +12,8 @@ int main(void) {
     // execute_t1();
     // execute_t2();
     // execute_t3();
-    execute_t3_real_time();
+    // execute_t3_real_time();
+    execute_t3_real_time_two_cores();
     return 0;
 }
 

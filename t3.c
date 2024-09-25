@@ -173,6 +173,22 @@ int execute_t3() {
     return 0;
 }
 
+
+int change_data(Cache *cache, long address, int newData) {
+    int index = hash_function(address, cache->size);
+    for (int i = 0; i < cache->size; i++) {
+        int probe_index = (index + i) % cache->size;
+        if (cache->cacheMap[probe_index].valid && cache->cacheMap[probe_index].address == address) {
+            cache->cacheMap[probe_index].data = newData;
+            return newData;
+        }
+        if (!cache->cacheMap[probe_index].valid) {
+            break;
+        }
+    }
+    return -1;
+}
+
 void clear_console() {
 #ifdef _WIN32
     system("cls"); // For Windows
@@ -196,6 +212,9 @@ int execute_t3_real_time() {
     int times = 0;
     char input[256];
     long address;
+    int newData;
+    char cacheName[4];
+
     while (1) {
         clear_console();
 
@@ -221,7 +240,33 @@ int execute_t3_real_time() {
             break;
         }
 
-        if (sscanf(input, "%lx", &address) == 1) {
+        // Handle data change input like "l1 1A2B3C 12543"
+        if (sscanf(input, "%s %lx %d", cacheName, &address, &newData) == 3) {
+            printf("changing data in %s cache at address 0x%lX to %d\n", cacheName, address, newData);
+            if (strcmp(cacheName, "l1") == 0) {
+                if (change_data(&l1Cache, address, newData) == -1) {
+                    printf("Address not found in L1 cache.\n");
+                } else {
+                    printf("Address 0x%lX in L1 cache changed to %d\n", address, newData);
+                }
+            } else if (strcmp(cacheName, "l2") == 0) {
+                if (change_data(&l2Cache, address, newData) == -1) {
+                    printf("Address not found in L2 cache.\n");
+                } else {
+                    printf("Address 0x%lX in L2 cache changed to %d\n", address, newData);
+                }
+            } else if (strcmp(cacheName, "l3") == 0) {
+                if (change_data(&l3Cache, address, newData) == -1) {
+                    printf("address not found in L3 cache.\n");
+                } else {
+                    printf("address 0x%lX in L3 cache changed to %d\n", address, newData);
+                }
+            } else {
+                printf("invalid cache name. Please use 'l1', 'l2', or 'l3'.\n");
+            }
+        }
+        // Handle address lookup
+        else if (sscanf(input, "%lx", &address) == 1) {
             times++;
             printf("address entered: 0x%lX\n", address);
             int timeTaken = access_data(&l1Cache, &l2Cache, &l3Cache, address);
@@ -239,6 +284,142 @@ int execute_t3_real_time() {
     free(l1Cache.cacheMap);
     free(l2Cache.cacheMap);
     free(l3Cache.cacheMap);
+
+    return 0;
+}
+
+int execute_t3_real_time_two_cores() {
+    srand(time(NULL));
+
+    Cache l1Cache = {L1_ACCESS_TIME, malloc(L1_SIZE * sizeof(CacheLine)), L1_SIZE};
+    Cache l2Cache = {L2_ACCESS_TIME, malloc(L2_SIZE * sizeof(CacheLine)), L2_SIZE};
+    Cache l3Cache = {L3_ACCESS_TIME, malloc(L3_SIZE * sizeof(CacheLine)), L3_SIZE};
+
+    for (int i = 0; i < L1_SIZE; i++) l1Cache.cacheMap[i].valid = 0;
+    for (int i = 0; i < L2_SIZE; i++) l2Cache.cacheMap[i].valid = 0;
+    for (int i = 0; i < L3_SIZE; i++) l3Cache.cacheMap[i].valid = 0;
+
+    Cache l1Cache2 = {L1_ACCESS_TIME, malloc(L1_SIZE * sizeof(CacheLine)), L1_SIZE};
+    Cache l2Cache2 = {L2_ACCESS_TIME, malloc(L2_SIZE * sizeof(CacheLine)), L2_SIZE};
+    Cache l3Cache2 = {L3_ACCESS_TIME, malloc(L3_SIZE * sizeof(CacheLine)), L3_SIZE};
+
+    for (int i = 0; i < L1_SIZE; i++) l1Cache2.cacheMap[i].valid = 0;
+    for (int i = 0; i < L2_SIZE; i++) l2Cache2.cacheMap[i].valid = 0;
+    for (int i = 0; i < L3_SIZE; i++) l3Cache2.cacheMap[i].valid = 0;
+
+    int totalTime = 0;
+    int times = 0;
+
+    int totalTime2 = 0;
+    int times2 = 0;
+
+    char input[256];
+    long address;
+    int newData;
+    char coreName[6];
+    char cacheName[4];
+
+    while (1) {
+        clear_console();
+
+        printf("cache status (Core 1): \n");
+        print_cache(&l1Cache, "l1 cache");
+        print_cache(&l2Cache, "l2 cache");
+        print_cache(&l3Cache, "l3 cache");
+
+        printf("\ncache status (Core 2): \n");
+        print_cache(&l1Cache2, "l1 cache");
+        print_cache(&l2Cache2, "l2 cache");
+        print_cache(&l3Cache2, "l3 cache");
+
+        printf("\n%s", result);
+        printf("\ncore 1 - access times: %d cycles\n", times);
+        printf("core 1 - total access time: %d cycles\n", totalTime);
+        if (times != 0) {
+            int average = totalTime / times;
+            printf("core 1 - average: %d cycles\n", average);
+        }
+        printf("core 2 - access times: %d cycles\n", times2);
+        printf("core 2 - total access time: %d cycles\n", totalTime2);
+        if (times2 != 0) {
+            int average2 = totalTime2 / times2;
+            printf("core 2 - average: %d cycles\n", average2);
+        }
+
+        printf("\nenter core (core1/core2), cache (l1/l2/l3), address (in hex), or type 'exit' to quit: ");
+        fgets(input, sizeof(input), stdin);
+        input[strcspn(input, "\n")] = 0; // Remove newline
+
+        if (strcmp(input, "exit") == 0) {
+            printf("exiting program.\n");
+            break;
+        }
+
+        if (sscanf(input, "%s %s %lx %d", coreName, cacheName, &address, &newData) == 4) {
+            printf("changing data in %s %s cache at address 0x%lX to %d\n", coreName, cacheName, address, newData);
+
+            Cache *cacheToModify = NULL;
+            if (strcmp(coreName, "core1") == 0) {
+                if (strcmp(cacheName, "l1") == 0) cacheToModify = &l1Cache;
+                else if (strcmp(cacheName, "l2") == 0) cacheToModify = &l2Cache;
+                else if (strcmp(cacheName, "l3") == 0) cacheToModify = &l3Cache;
+            } else if (strcmp(coreName, "core2") == 0) {
+                if (strcmp(cacheName, "l1") == 0) cacheToModify = &l1Cache2;
+                else if (strcmp(cacheName, "l2") == 0) cacheToModify = &l2Cache2;
+                else if (strcmp(cacheName, "l3") == 0) cacheToModify = &l3Cache2;
+            }
+
+            if (cacheToModify) {
+                if (change_data(cacheToModify, address, newData) == -1) {
+                    printf("address not found in %s cache.\n", cacheName);
+                } else {
+                    printf("address 0x%lX in %s cache changed to %d\n", address, cacheName, newData);
+                }
+            } else {
+                printf("invalid cache or core name. please use 'core1' or 'core2' and 'l1', 'l2', or 'l3'.\n");
+            }
+        }
+        else if (sscanf(input, "%s %lx", coreName, &address) == 2) {
+            printf("accessing data in %s's cache at address 0x%lX\n", coreName, address);
+
+            int *coreTime = NULL;
+            int *coreTimes = NULL;
+
+            if (strcmp(coreName, "core1") == 0) {
+                coreTime = &totalTime;
+                coreTimes = &times;
+
+                (*coreTimes)++;
+                int timeTaken = access_data(&l1Cache, &l2Cache, &l3Cache, address);
+                *coreTime += timeTaken;
+                cache_logic(&l1Cache, &l2Cache, &l3Cache);
+                printf("time taken: %d cycles\n", timeTaken);
+            } else if (strcmp(coreName, "core2") == 0) {
+                coreTime = &totalTime2;
+                coreTimes = &times2;
+
+                (*coreTimes)++;
+                int timeTaken = access_data(&l1Cache2, &l2Cache2, &l3Cache2, address);
+                *coreTime += timeTaken;
+                cache_logic(&l1Cache2, &l2Cache2, &l3Cache2);
+                printf("time taken: %d cycles\n", timeTaken);
+            } else {
+                printf("invalid core name. Please use 'core1' or 'core2'.\n");
+            }
+        }
+        else {
+            printf("invalid input, please enter core, cache, and address in hex, or 'exit' to quit.\n");
+        }
+
+        usleep(10000);
+    }
+
+    free(l1Cache.cacheMap);
+    free(l2Cache.cacheMap);
+    free(l3Cache.cacheMap);
+    free(l1Cache2.cacheMap);
+    free(l2Cache2.cacheMap);
+    free(l3Cache2.cacheMap);
 
     return 0;
 }
